@@ -1,0 +1,138 @@
+---
+title: "Test Technik Buying"
+subtitle: "Test Plazierung von Produkten"
+author: "Benjamin Kampka"
+output:
+ html_document:
+  css: style.css 
+  fig_height: 4
+  fig_width: 6
+  highlight: tango
+  number_sections: yes
+  theme: paper
+  toc: yes
+  toc_depth: 3
+  toc_float: 
+    collapsed: false
+    smooth_scroll: true 
+  df_print: paged
+bibliography: lit.bib
+csl: apa.csl
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	fig.align = 'center'
+)
+library(tidyverse)
+library(knitr)
+```
+
+
+# Beispielhafter Warenkorb:
+
+```{r}
+# create a list of baskets
+market_basket <-  
+  list(  
+c("MacBook", "MacBook-Ladekabel", "Ipad", "Iphone"),
+c("MacBook", "Macbook-Ladekabel", "Apple-Pencil"),
+c("MacBook", "Macbook-Ladekabel"), 
+c("Ipad", "Apple-Pencil"),
+c("Ipad", "Apple-Pencil", "Iphone"),
+c("Ipad", "Apple-Pencil", "MacBook"),
+c("MacBook", "Samsung-S20", "Samsung Pencil"),
+c("HP-Netbook", "ACDC-Ladekabel", "Samsung-Pencil", "Samsung-S20"), 
+c("HP-Netbook", "ACDC-Ladekabel", "Samsung-S20"), 
+c("HP-Netbook", "Samsung-S20"),
+c("HP-Netbook", "Iphone", "Ipad")
+  )
+
+# set transaction names (T1 to T8)
+names(market_basket) <- paste("T", c(1:11), sep = "")
+```
+
+ We use the measures support, confidence and lift to reduce the number of relationships we need to analyze:
+
+<div class = "blue">
+
+* **Support** is an indication of how frequently a set of items appear in baskets. 
+* **Confidence** is an indication of how often the support-rule has been found to be true.
+* **Lift** is a measure of association using both support and confidence.
+
+</div>
+
+# Implementation Algorithmus
+
+```{r}
+library(arules)
+```
+## Transform the Data + Summary
+```{r}
+trans <- as(market_basket, "transactions")
+summary(trans)
+```
+
+The `summary()` gives us information about our transaction object:
+
+* There are 11 transactions (rows) and 11 items (columns) and we can view the most frequent items.
+
+* Density tells us the percentage of non-zero cells in this 11x11-matrix. 
+
+* Element length distribution: a set of 2 items in 3 transactions; 3 items in 6 of the transactions and 4 items in 2 transactions.
+
+**Das Ganze kann man sich noch in 2 Plots/ Images anschauen**
+
+```{r}
+image(trans)
+itemFrequencyPlot(trans, topN=10,  cex.names=1)
+```
+
+# A-Priori Algorithm
+
+```{r}
+rules <- apriori(trans, parameter = list(supp=0.1, conf=0.5, 
+                                         maxlen=2, 
+                                         minlen=2,
+                                         target= "rules"))
+
+```
+```{r}
+inspect(rules)
+```
+**It is possible to analyze what items customers buy after buying {Iphone}**
+```{r}
+mac_rules_lhs <- apriori(trans, 
+                          parameter = list(supp=0.1, conf=0.6, 
+                                         maxlen=2, 
+                                         minlen=2),
+                          appearance = list(lhs="Iphone", default="rhs"))
+```
+Ergebnis:
+
+```{r}
+inspect(mac_rules_lhs)
+```
+
+## Graphicbasierte Visualisierung
+
+```{r}
+library(arulesViz)
+subrules <- head(rules, n = 10, by = "confidence")
+
+plot(subrules, method = "graph",  engine = "htmlwidget")
+```
+
+## Parralel Coordinate Plot
+
+```{r}
+plot(subrules, method="paracoord")
+```
+
+
+
+

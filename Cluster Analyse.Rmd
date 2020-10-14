@@ -1,0 +1,261 @@
+---
+title: "Test Cluster Analyse"
+subtitle: "Cluster Analyse"
+author: "Benjamin Kampka"
+output:
+ html_document:
+  css: style.css 
+  fig_height: 4
+  fig_width: 6
+  highlight: tango
+  number_sections: yes
+  theme: paper
+  toc: yes
+  toc_depth: 3
+  toc_float: 
+    collapsed: false
+    smooth_scroll: true 
+  df_print: paged
+bibliography: lit.bib
+csl: apa.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE, 
+	fig.align = 'center'
+)
+library(tidyverse)
+library(knitr)
+```
+
+# Implementierung in R
+
+```{r}
+df <- read_csv("https://raw.githubusercontent.com/kirenz/datasets/master/whr_20.csv")
+df
+```
+
+## Bereinigen der Daten:
+
+In dieser Analyse nutzen wir die landesspezifischen Informationen zu der Lebenserwartung in Jahren (healthy_life_expectancy) und das logarithmierte Bruttoinlandsprodukt pro Einwohner (logged_gdp_per_capita):
+
+```{r}
+df %>% 
+  ggplot(aes(logged_gdp_per_capita, 
+             healthy_life_expectancy, 
+             label = country_name )) +
+  geom_point() +
+  geom_text(check_overlap = TRUE,
+            vjust = 0, nudge_y = 0.5) +
+  theme_classic() +
+  ylab("Lebenserwartung") +
+  xlab("Bruttoinlandsprodukt pro Einwohner (logarithmiert)") 
+```
+Zufälliges ziehen von 20 Ländern:
+
+```{r}
+set.seed(1234)
+
+df <- df %>% 
+  sample_n(20)
+```
+
+Darstellung dieser 20 Länder:
+
+```{r}
+df %>% 
+  ggplot(aes(logged_gdp_per_capita, 
+             healthy_life_expectancy, 
+             label = country_name )) +
+  geom_point() +
+  geom_text(size = 3,
+            check_overlap = FALSE,
+            vjust = 0, nudge_y = 0.5) +
+  theme_classic() +
+  ylab("Lebenserwartung") +
+  xlab("Bruttoinlandsprodukt pro Einwohner (logarithmiert)") 
+```
+
+AUswahl
+
+```{r}
+df_cl <- select(df, c("country_name", 
+                      "logged_gdp_per_capita", 
+                      "healthy_life_expectancy"))
+df_cl <- drop_na(df_cl)
+df_cl
+```
+
+## Standardisierung -> Z-Transformation:
+
+```{r}
+df_cl$healthy_life_expectancy_sc <-  scale(df_cl$healthy_life_expectancy, 
+                                           center = TRUE, 
+                                           scale = TRUE)
+
+df_cl$logged_gdp_per_capita_sc <-  scale(df_cl$logged_gdp_per_capita, 
+                                         center = TRUE, 
+                                         scale = TRUE)
+
+df_cl %>% 
+  ggplot(aes(logged_gdp_per_capita_sc, 
+             healthy_life_expectancy_sc, 
+             label = country_name)) +
+  geom_point() +
+  geom_text(size = 3,
+            check_overlap = FALSE,
+            vjust = 0, nudge_y = 0.1) +
+  theme_classic() +
+  ylab("Lebenserwartung (z-Werte)") +
+  xlab("Bruttoinlandsprodukt pro Einwohner (z-Werte)")
+```
+## Proximitätsmaß:
+
+```{r}
+d <- 
+  df_cl %>% 
+  select(-country_name) %>% 
+  dist(method = "euclidean")
+```
+
+## Hierarchische Clusteranalyse:
+
+```{r}
+hc <- hclust(d, method = "ward.D2") 
+sort(unique(cophenetic(hc)))
+```
+
+**Dasrtellung Dendogram:**
+
+```{r}
+hc$labels <- df$country_name
+
+plot(hc)
+```
+
+**Cluster von 4 anzeigen:**
+
+```{r}
+hc$labels <- df$country_name
+
+plot(hc)
+
+rect.hclust(hc, k = 4, border = "red")
+```
+```{r}
+gruppen <- cutree(hc, k = 4)
+df_cl$cluster <- gruppen
+df_cl
+```
+
+```{r}
+df_cl %>% 
+  ggplot(aes(logged_gdp_per_capita, 
+             healthy_life_expectancy, 
+             label = country_name, 
+             color = factor(cluster))) +
+  geom_point() +
+  geom_text(size = 3,
+            check_overlap = FALSE,
+            vjust = 0, nudge_y = 0.5,
+            show.legend = FALSE) +
+  theme_classic() +
+  ylab("Lebenserwartung") +
+  xlab("Bruttoinlandsprodukt pro Einwohner (logarithmiert)") +
+  theme(legend.title=element_blank())
+```
+
+
+# Test mit Bsp. Kundendaten
+
+```{r}
+library("readxl")
+
+kunden_df <- read_excel("kundendaten.xlsx")
+kunden_df
+
+```
+```{r}
+kunden_df %>% 
+  ggplot(aes(Einkommen, 
+             Alter, 
+             label = Kundennummer )) +
+  geom_point() +
+  geom_text(check_overlap = TRUE,
+            vjust = 0, nudge_y = 0.5) +
+  theme_classic() +
+  ylab("Einkommen") +
+  xlab("Alter") 
+```
+## Standartisierung:
+
+```{r}
+set.seed(1234)
+
+kunden_df <- kunden_df %>% 
+  sample_n(20)
+
+kunden_df$Einkommen <-  scale(kunden_df$Einkommen, 
+                                           center = TRUE, 
+                                           scale = TRUE)
+
+kunden_df$Alter <-  scale(kunden_df$Alter, 
+                                         center = TRUE, 
+                                         scale = TRUE)
+
+kunden_df %>% 
+  ggplot(aes(Einkommen, 
+             Alter, 
+             label = Kundennummer )) +
+  geom_point() +
+  geom_text(size = 3,
+            check_overlap = FALSE,
+            vjust = 0, nudge_y = 0.1) +
+  theme_classic() +
+  ylab("Einkommen") +
+  xlab("Alter")
+```
+
+## Proximitätsmaß: 
+
+```{r}
+d <- 
+  kunden_df %>% 
+  select(-Kundennummer) %>% 
+  dist(method = "euclidean")
+hc <- hclust(d, method = "ward.D2") 
+sort(unique(cophenetic(hc)))
+hc$labels <- kunden_df$Kundennummer
+
+plot(hc)
+
+rect.hclust(hc, k = 2, border = "red")
+```
+
+```{r}
+gruppen <- cutree(hc, k = 2)
+kunden_df$cluster <- gruppen
+kunden_df
+```
+
+```{r}
+kunden_df %>% 
+  ggplot(aes(Einkommen, 
+             Alter, 
+             label = Kundennummer, 
+             color = factor(cluster))) +
+  geom_point() +
+  geom_text(size = 3,
+            check_overlap = FALSE,
+            vjust = 0, nudge_y = 0.5,
+            show.legend = FALSE) +
+  theme_classic() +
+  ylab("Einkommen") +
+  xlab("Alter") +
+  theme(legend.title=element_blank())
+```
+
+
